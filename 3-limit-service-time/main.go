@@ -26,19 +26,25 @@ type User struct {
 // if process had to be killed
 func HandleRequest(process func(), u *User) bool {
 	done := make(chan struct{})
+	ticker := time.NewTicker(1 * time.Millisecond)
 	go func(done chan struct{}) {
 		process()
-		select {
-		case done <- struct{}{}:
-		default:
-			return
-		}
+		done <- struct{}{}
 	}(done)
-	select {
-	case <-done:
-		return true
-	case <-time.After(10 * time.Second):
-		return false
+	for {
+		select {
+		case <-done:
+			return true
+		case <-time.After(10 * time.Second):
+			if !u.IsPremium {
+				return false
+			}
+		case <-ticker.C:
+			u.TimeUsed += int64(1)
+			if u.TimeUsed > 10*1000 && !u.IsPremium {
+				return false
+			}
+		}
 	}
 }
 
